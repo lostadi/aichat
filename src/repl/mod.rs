@@ -17,6 +17,7 @@ use crate::utils::{
 };
 
 use anyhow::{bail, Context, Result};
+use serde_json::json;
 use crossterm::cursor::SetCursorStyle;
 use fancy_regex::Regex;
 use reedline::CursorConfig;
@@ -31,7 +32,7 @@ use std::{env, process};
 
 const MENU_NAME: &str = "completion_menu";
 
-static REPL_COMMANDS: LazyLock<[ReplCommand; 38]> = LazyLock::new(|| {
+static REPL_COMMANDS: LazyLock<[ReplCommand; 39]> = LazyLock::new(|| {
     [
         ReplCommand::new(".help", "Show this help guide", AssertState::pass()),
         ReplCommand::new(".info", "Show system info", AssertState::pass()),
@@ -151,6 +152,21 @@ static REPL_COMMANDS: LazyLock<[ReplCommand; 38]> = LazyLock::new(|| {
             AssertState::True(StateFlags::RAG),
         ),
         ReplCommand::new(
+            ".search",
+            "Perform a web search",
+            AssertState::pass(),
+        ),
+        ReplCommand::new(
+            ".deep_search",
+            "Perform a deep web search with RAG",
+            AssertState::pass(),
+        ),
+        ReplCommand::new(
+            ".exec",
+            "Execute a shell command",
+            AssertState::pass(),
+        ),
+        ReplCommand::new(
             ".info rag",
             "Show RAG info",
             AssertState::True(StateFlags::RAG),
@@ -183,16 +199,7 @@ static REPL_COMMANDS: LazyLock<[ReplCommand; 38]> = LazyLock::new(|| {
             "Delete roles, sessions, RAGs, or agents",
             AssertState::pass(),
         ),
-        ReplCommand::new(
-            ".deep_search",
-            "Deep web search with RAG",
-            AssertState::pass(),
-        ),
-        ReplCommand::new(
-            ".searxng",
-            "Manage SearXNG container",
-            AssertState::pass(),
-        ),
+
         ReplCommand::new(".exit", "Exit REPL", AssertState::pass()),
     ]
 });
@@ -274,6 +281,7 @@ Type ".help" for additional help.
         let completer = ReplCompleter::new(config);
         let highlighter = ReplHighlighter::new(config);
         let menu = Self::create_menu();
+
         let edit_mode = Self::create_edit_mode(config);
         let cursor_config = CursorConfig {
             vi_insert: Some(SetCursorStyle::BlinkingBar),
@@ -596,6 +604,67 @@ pub async fn run_repl_command(
                 }
                 None => println!("Usage: .macro <name> <text>..."),
             },
+            ".search" => match args {
+                Some(query) => {
+                    use crate::function::ToolCall;
+                    let arguments = json!({"query": query});
+                    let tool_call = ToolCall::new("web_search".to_string(), arguments, None);
+                    match tool_call.eval(&config) {
+                        Ok(value) => {
+                            if let Ok(pretty_json) = serde_json::to_string_pretty(&value) {
+                                println!("{}", pretty_json);
+                            } else {
+                                eprintln!("Failed to serialize search results: {:?}", value);
+                            }
+                        }
+                        Err(e) => eprintln!("Error during web search: {}", e),
+                    }
+                }
+                None => println!("Usage: .search <query>"),
+            },
+            ".deep_search" => match args {
+                Some(query) => {
+                    let script_path = "aichat_py_root/web_search_rag/rag_core.py";
+                    if !std::path::Path::new(script_path).exists() {
+                        eprintln!("Error: Python RAG script not found at {}. Please check your installation.", script_path);
+                    } else {
+                        println!("Starting Deep Web Search RAG for: {}\n", query);
+                        let status = std::process::Command::new("python3")
+                            .arg(script_path)
+                            .arg(query)
+                            .status();
+                        match status {
+                            Ok(s) => {
+                                if !s.success() {
+                                    eprintln!("Deep web search failed.");
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to execute Python RAG script: {}", e);
+                            }
+                        }
+                    }
+                }
+                None => println!("Usage: .deep_search <query>"),
+            },
+            ".exec" => match args {
+                Some(command_string) => {
+                    use crate::function::ToolCall;
+                    let arguments = json!({"command": command_string});
+                    let tool_call = ToolCall::new("execute_shell_command".to_string(), arguments, None);
+                    match tool_call.eval(&config) {
+                        Ok(value) => {
+                            if let Ok(pretty_json) = serde_json::to_string_pretty(&value) {
+                                println!("{}", pretty_json);
+                            } else {
+                                eprintln!("Failed to serialize command execution results: {:?}", value);
+                            }
+                        }
+                        Err(e) => eprintln!("Error during command execution: {}", e),
+                    }
+                }
+                None => println!("Usage: .exec <command>"),
+            },
             ".file" => match args {
                 Some(args) => {
                     let (files, text) = split_args_text(args, cfg!(windows));
@@ -708,56 +777,7 @@ pub async fn run_repl_command(
                 }
                 _ => unknown_command()?,
             },
-            ".deep_search" => match args {
-                Some(query) => {
-                    let script_path = "aichat_py_root/web_search_rag/rag_core.py";
-                    if !std::path::Path::new(script_path).exists() {
-                        println!("Error: Python RAG script not found at {}. Please check your installation.", script_path);
-                    } else {
-                        println!("Starting Deep Web Search RAG for: {}\n", query);
-                        let status = std::process::Command::new("python3")
-                            .arg(script_path)
-                            .arg(query)
-                            .status();
-                        match status {
-                            Ok(s) => {
-                                if !s.success() {
-                                    println!("Deep web search failed.");
-                                }
-                            }
-                            Err(e) => {
-                                println!("Failed to execute Python RAG script: {}", e);
-                            }
-                        }
-                    }
-                }
-                None => println!("Usage: .deep_search <query>"),
-            },
-            ".searxng" => match args {
-                Some(action) => {
-                    let script_path = "scripts/searxng/manage_searxng.sh";
-                    if !std::path::Path::new(script_path).exists() {
-                         println!("Error: SearXNG management script not found at {}. Please check your installation.", script_path);
-                    } else {
-                        let _ = std::process::Command::new("chmod").arg("+x").arg(script_path).status();
-                        let status = std::process::Command::new("bash")
-                            .arg(script_path)
-                            .arg(action)
-                            .status();
-                        match status {
-                             Ok(s) => {
-                                if !s.success() {
-                                    println!("SearXNG command failed.");
-                                }
-                            }
-                            Err(e) => {
-                                println!("Failed to execute SearXNG script: {}", e);
-                            }
-                        }
-                    }
-                }
-                None => println!("Usage: .searxng <start|stop|status|restart>"),
-            }, 
+ 
             _ => unknown_command()?,
         },
         None => {
