@@ -1,0 +1,20 @@
+# Deep Web Search Configuration (add this to your ~/.config/aichat/config.yaml)
+
+websearch:
+  # SearXNG Configuration
+  searxng_url: "http://localhost:8080"
+  
+  # Ollama Configuration for RAG
+  ollama:
+    model: "huihui_ai/jan-nano-abliterated:latest"
+    embedding_model: "nomic-embed-text"
+  
+  # RAG Parameters
+  rag:
+    chunk_size: 1000
+    chunk_overlap: 200
+    k_retriever: 20
+    k_context: 10
+
+  # Example of Docker configuration references (managed via `aichat --manage-searxng`)
+  # The management script uses scripts/searxng/docker-compose.yml 

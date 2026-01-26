@@ -1,26 +1,69 @@
 #!/bin/sh
 
-# Placeholder for web_search tool
+# Web search tool using SearXNG
 # Expects a JSON string as the first argument, e.g., {"query": "search terms"}
 # Outputs a JSON string representing search results
 
-# Extract the query (basic parsing, assumes simple structure)
-query=$(echo "$1" | sed -n 's/.*"query":"\([^"]*\)".*/\1/p')
+# Configuration
+SEARXNG_URL="${SEARXNG_URL:-http://localhost:8080}"
+TIMEOUT=10
 
-# Output dummy JSON results
-cat <<EOF
+# Extract the query (basic parsing, assumes simple structure)
+query=$(echo "$1" | sed -n 's/.*"query"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+
+if [ -z "$query" ]; then
+    echo '{"error": "No query provided", "results": []}'
+    exit 1
+fi
+
+# URL encode the query
+encoded_query=$(printf '%s' "$query" | sed 's/ /+/g; s/[^a-zA-Z0-9+_.~-]/%&/g' | tr '[:lower:]' '[:upper:]' | sed 's/%\(..\)/%\L\1/g')
+
+# Make the request to SearXNG
+response=$(curl -s --connect-timeout 5 --max-time "$TIMEOUT" \
+    -H "Accept: application/json" \
+    "${SEARXNG_URL}/search?q=${encoded_query}&format=json" 2>/dev/null)
+
+if [ $? -ne 0 ] || [ -z "$response" ]; then
+    # SearXNG not available - return informative error
+    cat <<EOF
 {
-  "results": [
-    {
-      "title": "Dummy Result 1 for '$query'",
-      "url": "https://example.com/result1",
-      "snippet": "This is the first dummy search result."
-    },
-    {
-      "title": "Dummy Result 2 for '$query'",
-      "url": "https://example.com/result2",
-      "snippet": "This is the second dummy search result."
-    }
-  ]
+  "error": "SearXNG not available at ${SEARXNG_URL}. Start it with: aichat --manage-searxng start",
+  "results": []
 }
 EOF
+    exit 0
+fi
+
+# Check if jq is available for proper JSON parsing
+if command -v jq >/dev/null 2>&1; then
+    # Use jq for proper JSON extraction
+    echo "$response" | jq -c '{
+        results: [.results[:10][] | {
+            title: .title,
+            url: .url,
+            snippet: (.content // .snippet // "No description available")
+        }]
+    }' 2>/dev/null
+    
+    if [ $? -ne 0 ]; then
+        # jq failed, response might not be valid JSON
+        echo '{"error": "Invalid response from SearXNG", "results": []}'
+    fi
+else
+    # Fallback: basic parsing without jq
+    # Extract up to 5 results using sed/awk (limited but works)
+    echo "$response" | grep -o '"title":"[^"]*"' | head -5 | while read -r line; do
+        title=$(echo "$line" | sed 's/"title":"\([^"]*\)"/\1/')
+        echo "  - $title"
+    done
+    
+    # For actual JSON output, we need jq - output a warning
+    cat <<EOF
+{
+  "warning": "Install jq for better JSON parsing",
+  "raw_response_available": true,
+  "results": []
+}
+EOF
+fi

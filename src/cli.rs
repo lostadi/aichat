@@ -90,6 +90,12 @@ pub struct Cli {
     /// Run as a daemon
     #[clap(long)]
     pub daemon: bool,
+    /// Deep web search with RAG
+    #[clap(long, value_name = "QUERY")]
+    pub deep_search: Option<String>,
+    /// Manage SearXNG container (start|stop|status|restart)
+    #[clap(long, value_name = "ACTION")]
+    pub manage_searxng: Option<String>,
     /// execute a dedicated subcommand
     #[clap(subcommand)]
     pub command: Option<Commands>,

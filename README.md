@@ -6,6 +6,19 @@
 
 AIChat is an all-in-one LLM CLI tool featuring Shell Assistant, CMD & REPL Mode, RAG, AI Tools & Agents, and More.
 
+## Extended Features by Lee Ostadi
+
+The following advanced features were implemented by **Lee Ostadi**:
+
+| Feature                  | Description                                          |
+| ------------------------ | ---------------------------------------------------- |
+| **Daemon Mode**          | TCP IPC server on port 8787 for background operation |
+| **Terminal History RAG** | AI-aware shell history with embeddings-based context |
+| **Deep Web Search**      | SearXNG + Ollama RAG pipeline for research           |
+| **Web Search**           | Real-time SearXNG integration for quick searches     |
+| **Multi-Agent Arena**    | Multiple agents debating/collaborating on prompts    |
+| **Enhanced Shell Tools** | ~45 safe commands with injection protection          |
+
 ## Install
 
 ### Package Managers
@@ -147,6 +160,28 @@ echo "PING" | nc localhost 8787
 # Response: PONG
 ```
 
+### Deep Web Search (RAG)
+
+Perform comprehensive web research using a local SearXNG instance and RAG pipeline.
+
+```bash
+# Manage local SearXNG container
+aichat --manage-searxng start  # Start container
+aichat --manage-searxng status # Check status
+aichat --manage-searxng stop   # Stop container
+
+# Perform deep web search
+aichat --deep-search "What is the current state of quantum computing?"
+```
+
+**Prerequisites:**
+
+- Docker (for SearXNG container)
+- Python 3.10+ with dependencies installed:
+  ```bash
+  pip install -r aichat_py_root/web_search_rag/requirements.txt
+  ```
+
 ### Web Search
 
 Perform quick web searches directly from the command line.
@@ -245,6 +280,56 @@ A web application to interact with supported LLMs directly from your browser.
 A web platform to compare different LLMs side-by-side.
 
 ![aichat-llm-arena](https://github.com/user-attachments/assets/edabba53-a1ef-4817-9153-38542ffbfec6)
+
+### Enhanced Web Search & Shell Tools (by Lee Ostadi)
+
+Real-time web search integration using SearXNG and an expanded safe shell command executor.
+
+**Web Search Features:**
+
+- Real SearXNG backend integration (instead of dummy data)
+- Configurable via `SEARXNG_URL` environment variable
+- JSON output with titles, URLs, and snippets
+- Graceful fallback when SearXNG unavailable
+
+**Shell Command Executor:**
+
+- ~45 safe read-only commands whitelisted
+- Includes: `whoami`, `hostname`, `uname`, `df`, `free`, `ps`, `git status`, version checks
+- Security-focused with injection protection
+
+**Setup:**
+
+```bash
+# 1. Install system dependencies
+sudo apt install docker.io docker-compose jq curl
+
+# 2. Make function scripts executable
+chmod +x functions/bin/web_search functions/bin/execute_shell_command
+
+# 3. Start SearXNG container (for web search)
+aichat --manage-searxng start
+
+# 4. Test web search
+aichat --search "latest AI news"
+
+# 5. Test shell execution
+aichat --exec "uname -a"
+```
+
+**For Deep Search (requires Ollama):**
+
+```bash
+# Install Python dependencies
+pip install -r aichat_py_root/web_search_rag/requirements.txt
+
+# Ensure Ollama is running with required models
+ollama pull nomic-embed-text
+ollama pull huihui_ai/jan-nano-abliterated:latest
+
+# Run deep search
+aichat --deep-search "quantum computing breakthroughs 2024"
+```
 
 ## Custom Themes
 

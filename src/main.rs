@@ -166,6 +166,65 @@ async fn run(config: GlobalConfig, cli: Cli, text: Option<String>) -> Result<()>
         }
     }
 
+    if let Some(action) = &cli.manage_searxng {
+        let script_path = "scripts/searxng/manage_searxng.sh";
+        if !std::path::Path::new(script_path).exists() {
+             eprintln!("Error: SearXNG management script not found at {}. Please check your installation.", script_path);
+             std::process::exit(1);
+        }
+        // Ensure executable
+        let _ = std::process::Command::new("chmod").arg("+x").arg(script_path).status();
+        
+        let status = std::process::Command::new("bash")
+            .arg(script_path)
+            .arg(action)
+            .status();
+            
+        match status {
+            Ok(s) => {
+                if !s.success() {
+                    eprintln!("SearXNG management command failed.");
+                    std::process::exit(1);
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to execute SearXNG management script: {}", e);
+                std::process::exit(1);
+            }
+        }
+        return Ok(());
+    }
+
+    if let Some(query) = &cli.deep_search {
+        let script_path = "aichat_py_root/web_search_rag/rag_core.py";
+        if !std::path::Path::new(script_path).exists() {
+             eprintln!("Error: Python RAG script not found at {}. Please check your installation.", script_path);
+             std::process::exit(1);
+        }
+        
+        println!("Starting Deep Web Search RAG for: {}\n", query);
+        
+        let status = std::process::Command::new("python3")
+            .arg(script_path)
+            .arg(query)
+            .status();
+            
+        match status {
+             Ok(s) => {
+                if !s.success() {
+                    eprintln!("Deep web search failed.");
+                    std::process::exit(1);
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to execute Python RAG script: {}", e);
+                eprintln!("Ensure 'python3' is installed and dependencies from 'aichat_py_root/web_search_rag/requirements.txt' are installed.");
+                std::process::exit(1);
+            }
+        }
+        return Ok(());
+    }
+
     if let Some(query) = cli.search_query {
         use crate::function::ToolCall;
         use serde_json::json;

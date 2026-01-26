@@ -31,7 +31,7 @@ use std::{env, process};
 
 const MENU_NAME: &str = "completion_menu";
 
-static REPL_COMMANDS: LazyLock<[ReplCommand; 36]> = LazyLock::new(|| {
+static REPL_COMMANDS: LazyLock<[ReplCommand; 38]> = LazyLock::new(|| {
     [
         ReplCommand::new(".help", "Show this help guide", AssertState::pass()),
         ReplCommand::new(".info", "Show system info", AssertState::pass()),
@@ -181,6 +181,16 @@ static REPL_COMMANDS: LazyLock<[ReplCommand; 36]> = LazyLock::new(|| {
         ReplCommand::new(
             ".delete",
             "Delete roles, sessions, RAGs, or agents",
+            AssertState::pass(),
+        ),
+        ReplCommand::new(
+            ".deep_search",
+            "Deep web search with RAG",
+            AssertState::pass(),
+        ),
+        ReplCommand::new(
+            ".searxng",
+            "Manage SearXNG container",
             AssertState::pass(),
         ),
         ReplCommand::new(".exit", "Exit REPL", AssertState::pass()),
@@ -698,6 +708,56 @@ pub async fn run_repl_command(
                 }
                 _ => unknown_command()?,
             },
+            ".deep_search" => match args {
+                Some(query) => {
+                    let script_path = "aichat_py_root/web_search_rag/rag_core.py";
+                    if !std::path::Path::new(script_path).exists() {
+                        println!("Error: Python RAG script not found at {}. Please check your installation.", script_path);
+                    } else {
+                        println!("Starting Deep Web Search RAG for: {}\n", query);
+                        let status = std::process::Command::new("python3")
+                            .arg(script_path)
+                            .arg(query)
+                            .status();
+                        match status {
+                            Ok(s) => {
+                                if !s.success() {
+                                    println!("Deep web search failed.");
+                                }
+                            }
+                            Err(e) => {
+                                println!("Failed to execute Python RAG script: {}", e);
+                            }
+                        }
+                    }
+                }
+                None => println!("Usage: .deep_search <query>"),
+            },
+            ".searxng" => match args {
+                Some(action) => {
+                    let script_path = "scripts/searxng/manage_searxng.sh";
+                    if !std::path::Path::new(script_path).exists() {
+                         println!("Error: SearXNG management script not found at {}. Please check your installation.", script_path);
+                    } else {
+                        let _ = std::process::Command::new("chmod").arg("+x").arg(script_path).status();
+                        let status = std::process::Command::new("bash")
+                            .arg(script_path)
+                            .arg(action)
+                            .status();
+                        match status {
+                             Ok(s) => {
+                                if !s.success() {
+                                    println!("SearXNG command failed.");
+                                }
+                            }
+                            Err(e) => {
+                                println!("Failed to execute SearXNG script: {}", e);
+                            }
+                        }
+                    }
+                }
+                None => println!("Usage: .searxng <start|stop|status|restart>"),
+            }, 
             _ => unknown_command()?,
         },
         None => {
