@@ -4,7 +4,7 @@
 [![Crates](https://img.shields.io/crates/v/aichat.svg)](https://crates.io/crates/aichat)
 [![Discord](https://img.shields.io/discord/1226737085453701222?label=Discord)](https://discord.gg/mr3ZZUB9hG)
 
-AIChat is an all-in-one LLM CLI tool featuring Shell Assistant, CMD & REPL Mode, RAG, AI Tools & Agents, and More. 
+AIChat is an all-in-one LLM CLI tool featuring Shell Assistant, CMD & REPL Mode, RAG, AI Tools & Agents, and More.
 
 ## Install
 
@@ -56,7 +56,7 @@ Accept diverse input forms such as stdin, local files and directories, and remot
 | Local files       | `aichat -f image.png -f data.txt`    | `.file image.png data.txt`       |
 | Local directories | `aichat -f dir/`                     | `.file dir/`                     |
 | Remote URLs       | `aichat -f https://example.com`      | `.file https://example.com`      |
-| External commands | ```aichat -f '`git diff`'```         | ```.file `git diff` ```          |
+| External commands | ``aichat -f '`git diff`'``           | ``.file `git diff` ``            |
 | Combine Inputs    | `aichat -f dir/ -f data.txt explain` | `.file dir/ data.txt -- explain` |
 
 ### Role
@@ -92,29 +92,75 @@ Integrate external documents into your LLM conversations for more accurate and c
 AIChat can further enhance its contextual understanding by leveraging your terminal command history. This allows the AI to provide more relevant assistance and suggestions based on your recent command-line activity.
 
 **Purpose:**
+
 - To provide `aichat` with context from your shell command history.
 - To enable more relevant and intelligent assistance, especially for shell-related queries or when recalling past commands.
 
 **User Consent:**
 Due to the sensitive nature of shell command history (which can contain passwords, API keys, personal information, etc.), `aichat` requires your explicit consent before accessing this data.
+
 - If `terminal_history_rag.enabled` is set to `true` in your configuration, `aichat` will prompt you for permission on its first run.
 - If you grant consent, this choice is saved, and `aichat` will proceed to use the feature.
 - If you deny consent, the feature will be automatically disabled for that session and future sessions until consent is granted (e.g., by manually setting `consent_given: true` in the config after understanding the risks, or if a command to re-prompt is added in the future).
 
 **Configuration Options (in `config.yaml` under `terminal_history_rag`):**
+
 ```yaml
 terminal_history_rag:
-  enabled: false                 # Set to true to enable this feature (will prompt for consent if not given).
+  enabled: false # Set to true to enable this feature (will prompt for consent if not given).
   # consent_given: false         # Managed by aichat after your first response to the consent prompt.
-  max_history_commands: 2000     # Maximum number of recent shell commands to load and index.
-  top_k: 3                       # Number of most relevant history snippets to retrieve for context.
-  include_timestamps: true       # Whether to include command timestamps in the text sent for embedding (if available from your shell).
+  max_history_commands: 2000 # Maximum number of recent shell commands to load and index.
+  top_k: 3 # Number of most relevant history snippets to retrieve for context.
+  include_timestamps: true # Whether to include command timestamps in the text sent for embedding (if available from your shell).
 ```
 
 **Privacy and Security Considerations:**
+
 - **Sensitive Data:** Be aware that your shell history can contain sensitive information like passwords, API keys, file paths, and personal details.
 - **Data Usage:** When this feature is active, `aichat` reads your history, processes it locally to find relevant commands, and then includes snippets of these commands (the raw command text) in the prompt sent to the configured Large Language Model (LLM).
 - **Risk Acceptance:** Only enable this feature if you understand and accept the risk of parts of your command history being processed and potentially sent to the LLM provider. `aichat` does not filter or redact sensitive data from your history before using it for RAG.
+
+### Daemon Mode
+
+Run AIChat as a background daemon service with a TCP server for fast IPC (Inter-Process Communication).
+
+```bash
+# Start daemon mode
+aichat --daemon
+```
+
+**Features:**
+
+- Listens on `127.0.0.1:8787` for incoming connections
+- Supports PING/PONG health checks
+- Enables faster response times by keeping the LLM connection warm
+- Useful for integrating AIChat with other applications or scripts
+
+**Testing the daemon:**
+
+```bash
+# Start daemon in background
+aichat --daemon &
+
+# Test connection
+echo "PING" | nc localhost 8787
+# Response: PONG
+```
+
+### Web Search
+
+Perform quick web searches directly from the command line.
+
+```bash
+# Perform a web search
+aichat --search "latest rust programming news"
+```
+
+**Features:**
+
+- Quick access to web search results
+- Results are formatted for easy reading in the terminal
+- Can be combined with other AIChat features for research workflows
 
 ### Function Calling
 
@@ -146,9 +192,9 @@ aichat --agent <AGENT_NAME_1> --agent <AGENT_NAME_2> [--agent <AGENT_NAME_N>...]
 
 **Arguments:**
 
-*   `--agent <AGENT_NAME>`: Specify the name of a configured agent to participate. At least two agents are required. This argument can be used multiple times for additional agents.
-*   `--prompt <INITIAL_PROMPT>`: The initial prompt or topic that kicks off the conversation between the agents.
-*   `--max-turns <TURNS>`: Optional. The maximum number of LLM responses in the entire conversation (i.e., total turns taken by all agents). Defaults to 10. Each agent responding once counts as one turn.
+- `--agent <AGENT_NAME>`: Specify the name of a configured agent to participate. At least two agents are required. This argument can be used multiple times for additional agents.
+- `--prompt <INITIAL_PROMPT>`: The initial prompt or topic that kicks off the conversation between the agents.
+- `--max-turns <TURNS>`: Optional. The maximum number of LLM responses in the entire conversation (i.e., total turns taken by all agents). Defaults to 10. Each agent responding once counts as one turn.
 
 **Agent Configuration:**
 
@@ -176,14 +222,14 @@ LLM Arena:            http://127.0.0.1:8000/arena?num=2
 
 #### Proxy LLM APIs
 
-The LLM Arena is a web-based platform where you can compare different LLMs side-by-side. 
+The LLM Arena is a web-based platform where you can compare different LLMs side-by-side.
 
 Test with curl:
 
 ```sh
 curl -X POST -H "Content-Type: application/json" -d '{
   "model":"claude:claude-3-5-sonnet-20240620",
-  "messages":[{"role":"user","content":"hello"}], 
+  "messages":[{"role":"user","content":"hello"}],
   "stream":true
 }' http://127.0.0.1:8000/v1/chat/completions
 ```
