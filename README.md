@@ -19,6 +19,63 @@ The following advanced features were implemented by **Lee Ostadi**:
 | **Multi-Agent Arena**    | Multiple agents debating/collaborating on prompts    |
 | **Enhanced Shell Tools** | ~45 safe commands with injection protection          |
 
+### Complete Setup (Extended Features)
+
+**1. Clone and Build:**
+
+```bash
+git clone https://github.com/lostadi/aichat.git
+cd aichat
+cargo build --release
+```
+
+**2. Install System Dependencies (Ubuntu/Debian):**
+
+```bash
+sudo apt update
+sudo apt install -y docker.io docker-compose jq curl python3-pip
+sudo usermod -aG docker $USER && newgrp docker
+```
+
+**3. Make Scripts Executable:**
+
+```bash
+chmod +x functions/bin/web_search functions/bin/execute_shell_command
+chmod +x scripts/searxng/manage_searxng.sh
+```
+
+**4. Install Python Dependencies (for Deep Search):**
+
+```bash
+pip install -r aichat_py_root/web_search_rag/requirements.txt
+```
+
+**5. Install Ollama (for Deep Search RAG):**
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull nomic-embed-text
+ollama pull huihui_ai/jan-nano-abliterated:latest
+```
+
+**6. Configure:**
+
+```bash
+mkdir -p ~/.config/aichat
+cp config.example.yaml ~/.config/aichat/config.yaml
+# Edit config.yaml to add your API keys
+```
+
+**7. Add to PATH and Test:**
+
+```bash
+export PATH="$PATH:$(pwd)/target/release"
+aichat --manage-searxng start   # Start SearXNG
+aichat --search "hello world"   # Test web search
+aichat --exec "uname -a"        # Test shell tools
+aichat                          # Start REPL
+```
+
 ## Install
 
 ### Package Managers
