@@ -145,7 +145,7 @@ pub struct Config {
     pub save_shell_history: bool,
     pub sync_models_url: Option<String>,
 
-    #[serde(skip)]
+
     pub clients: Vec<ClientConfig>,
 
     #[serde(skip)]

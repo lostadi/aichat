@@ -6,11 +6,11 @@ use super::*;
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{Duration, Utc};
 use reqwest::{Client as ReqwestClient, RequestBuilder};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{path::PathBuf, str::FromStr};
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct VertexAIConfig {
     pub name: Option<String>,
     pub project_id: Option<String>,

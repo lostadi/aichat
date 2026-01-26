@@ -4,12 +4,12 @@ use super::*;
 
 use anyhow::{bail, Context, Result};
 use reqwest::RequestBuilder;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 const API_BASE: &str = "https://api.cohere.ai/v2";
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct CohereConfig {
     pub name: Option<String>,
     pub api_key: Option<String>,

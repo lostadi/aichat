@@ -3,12 +3,12 @@ use super::*;
 
 use anyhow::{Context, Result};
 use reqwest::RequestBuilder;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 const API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta";
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct GeminiConfig {
     pub name: Option<String>,
     pub api_key: Option<String>,

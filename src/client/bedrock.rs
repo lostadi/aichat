@@ -10,10 +10,10 @@ use chrono::{DateTime, Utc};
 use futures_util::StreamExt;
 use indexmap::IndexMap;
 use reqwest::{Client as ReqwestClient, Method, RequestBuilder};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BedrockConfig {
     pub name: Option<String>,
     pub access_key_id: Option<String>,

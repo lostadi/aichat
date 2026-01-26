@@ -14,7 +14,7 @@ use inquire::{
     list_option::ListOption, required, validator::Validation, MultiSelect, Select, Text,
 };
 use reqwest::{Client as ReqwestClient, RequestBuilder};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -197,13 +197,13 @@ impl Default for ClientConfig {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct ExtraConfig {
     pub proxy: Option<String>,
     pub connect_timeout: Option<u64>,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct RequestPatch {
     pub chat_completions: Option<ApiPatch>,
     pub embeddings: Option<ApiPatch>,

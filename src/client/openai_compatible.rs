@@ -3,10 +3,10 @@ use super::*;
 
 use anyhow::{Context, Result};
 use reqwest::RequestBuilder;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OpenAICompatibleConfig {
     pub name: Option<String>,
     pub api_base: Option<String>,

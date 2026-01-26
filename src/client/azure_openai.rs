@@ -2,9 +2,9 @@ use super::openai::*;
 use super::*;
 
 use anyhow::Result;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AzureOpenAIConfig {
     pub name: Option<String>,
     pub api_base: Option<String>,
