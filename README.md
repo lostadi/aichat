@@ -21,6 +21,18 @@ The following advanced features were implemented by **Lee Ostadi**:
 
 ### Complete Setup (Extended Features)
 
+**Quick Setup (Ubuntu/Debian):**
+
+```bash
+git clone https://github.com/lostadi/aichat.git
+cd aichat
+./setup_ubuntu.sh
+```
+
+This script installs all dependencies, builds aichat, and configures everything automatically.
+
+**Manual Setup:**
+
 **1. Clone and Build:**
 
 ```bash
