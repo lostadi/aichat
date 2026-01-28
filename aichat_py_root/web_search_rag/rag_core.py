@@ -14,9 +14,9 @@ from bs4 import BeautifulSoup
 from langchain_community.vectorstores import FAISS
 from langchain_ollama import OllamaLLM
 from langchain_ollama import OllamaEmbeddings
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain_core.documents import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # --- Configuration Loading ---
 CONFIG_PATH = os.path.expanduser("~/.config/aichat/config.yaml")

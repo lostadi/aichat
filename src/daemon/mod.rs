@@ -26,7 +26,7 @@ pub fn start_daemon() -> io::Result<()> {
     Ok(())
 }
 
-fn handle_client(mut stream: TcpStream) -> io::Result<()> {
+fn handle_client(stream: TcpStream) -> io::Result<()> {
     let peer_addr = stream.peer_addr()?;
     info!("Handling client from: {}", peer_addr);
 

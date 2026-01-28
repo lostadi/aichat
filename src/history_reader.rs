@@ -45,7 +45,7 @@ fn detect_shell() -> Result<String> {
         })
 }
 
-fn get_history_file_path(shell_name: &str, env_var_name: &str, default_filename: &str) -> Result<PathBuf> {
+fn get_history_file_path(_shell_name: &str, env_var_name: &str, default_filename: &str) -> Result<PathBuf> {
     if let Ok(histfile_path_str) = env::var(env_var_name) {
         if !histfile_path_str.is_empty() {
             let path = PathBuf::from(histfile_path_str);
@@ -70,7 +70,7 @@ fn read_bash_history(max_commands: usize) -> Result<Vec<CommandHistoryEntry>> {
 
     let file = File::open(path).context("Failed to open Bash history file")?;
     let reader = BufReader::new(file);
-    let mut lines: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
+    let lines: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
 
     let mut entries = Vec::new();
     let mut current_timestamp: Option<i64> = None;

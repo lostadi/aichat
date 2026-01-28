@@ -196,29 +196,48 @@ async fn run(config: GlobalConfig, cli: Cli, text: Option<String>) -> Result<()>
     }
 
     if let Some(query) = &cli.deep_search {
-        let script_path = "aichat_py_root/web_search_rag/rag_core.py";
-        if !std::path::Path::new(script_path).exists() {
-             eprintln!("Error: Python RAG script not found at {}. Please check your installation.", script_path);
-             std::process::exit(1);
-        }
+        // Try multiple locations for the script
+        let script_name = "aichat_py_root/web_search_rag/rag_core.py";
+        let possible_paths = vec![
+            // User's aichat directory
+            dirs::home_dir().map(|h| h.join("aichat").join(script_name)),
+            // Current directory
+            Some(std::path::PathBuf::from(script_name)),
+            // Relative to executable
+            std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join(script_name))),
+        ];
         
-        println!("Starting Deep Web Search RAG for: {}\n", query);
+        let script_path = possible_paths
+            .into_iter()
+            .flatten()
+            .find(|p| p.exists());
         
-        let status = std::process::Command::new("python3")
-            .arg(script_path)
-            .arg(query)
-            .status();
-            
-        match status {
-             Ok(s) => {
-                if !s.success() {
-                    eprintln!("Deep web search failed.");
-                    std::process::exit(1);
+        match script_path {
+            Some(path) => {
+                println!("Starting Deep Web Search RAG for: {}\n", query);
+                
+                let status = std::process::Command::new("python3")
+                    .arg(&path)
+                    .arg(query)
+                    .status();
+                    
+                match status {
+                    Ok(s) => {
+                        if !s.success() {
+                            eprintln!("Deep web search failed.");
+                            std::process::exit(1);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to execute Python RAG script: {}", e);
+                        eprintln!("Ensure 'python3' is installed and dependencies from 'aichat_py_root/web_search_rag/requirements.txt' are installed.");
+                        std::process::exit(1);
+                    }
                 }
             }
-            Err(e) => {
-                eprintln!("Failed to execute Python RAG script: {}", e);
-                eprintln!("Ensure 'python3' is installed and dependencies from 'aichat_py_root/web_search_rag/requirements.txt' are installed.");
+            None => {
+                eprintln!("Error: Python RAG script not found.");
+                eprintln!("Searched in: ~/aichat/{}, ./{}, and executable dir.", script_name, script_name);
                 std::process::exit(1);
             }
         }

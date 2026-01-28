@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use crate::config::GlobalConfig;
 use crate::history_reader::CommandHistoryEntry;
-use crate::client::{Client, EmbeddingsData, Model, ModelType}; // Actual client for embeddings
-use crate::utils::now_timestamp; // For potential timing/logging if needed
+use crate::client::{Client, EmbeddingsData, Model}; // Actual client for embeddings
+// Note: Import crate::utils::now_timestamp if timing/logging is needed in the future
 
 // Actual embedding vector type
 pub type Embedding = Vec<f32>;

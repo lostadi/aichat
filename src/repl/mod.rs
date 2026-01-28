@@ -624,24 +624,40 @@ pub async fn run_repl_command(
             },
             ".deep_search" => match args {
                 Some(query) => {
-                    let script_path = "aichat_py_root/web_search_rag/rag_core.py";
-                    if !std::path::Path::new(script_path).exists() {
-                        eprintln!("Error: Python RAG script not found at {}. Please check your installation.", script_path);
-                    } else {
-                        println!("Starting Deep Web Search RAG for: {}\n", query);
-                        let status = std::process::Command::new("python3")
-                            .arg(script_path)
-                            .arg(query)
-                            .status();
-                        match status {
-                            Ok(s) => {
-                                if !s.success() {
-                                    eprintln!("Deep web search failed.");
+                    // Try multiple locations for the script
+                    let script_name = "aichat_py_root/web_search_rag/rag_core.py";
+                    let possible_paths = vec![
+                        dirs::home_dir().map(|h| h.join("aichat").join(script_name)),
+                        Some(std::path::PathBuf::from(script_name)),
+                        std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join(script_name))),
+                    ];
+                    
+                    let script_path = possible_paths
+                        .into_iter()
+                        .flatten()
+                        .find(|p| p.exists());
+                    
+                    match script_path {
+                        Some(path) => {
+                            println!("Starting Deep Web Search RAG for: {}\n", query);
+                            let status = std::process::Command::new("python3")
+                                .arg(&path)
+                                .arg(query)
+                                .status();
+                            match status {
+                                Ok(s) => {
+                                    if !s.success() {
+                                        eprintln!("Deep web search failed.");
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to execute Python RAG script: {}", e);
                                 }
                             }
-                            Err(e) => {
-                                eprintln!("Failed to execute Python RAG script: {}", e);
-                            }
+                        }
+                        None => {
+                            eprintln!("Error: Python RAG script not found.");
+                            eprintln!("Searched in: ~/aichat/{}, ./{}, and executable dir.", script_name, script_name);
                         }
                     }
                 }
