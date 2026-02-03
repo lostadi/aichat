@@ -8,10 +8,15 @@
 SEARXNG_URL="${SEARXNG_URL:-http://localhost:8080}"
 TIMEOUT=10
 
-# Extract the query (basic parsing, assumes simple structure)
-query=$(echo "$1" | sed -n 's/.*"query"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+# Extract the query
+if command -v jq >/dev/null 2>&1; then
+    query=$(echo "$1" | jq -r '.query')
+else
+    # Fallback: simple parsing, might fail on complex JSON
+    query=$(echo "$1" | sed -n 's/.*"query"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+fi
 
-if [ -z "$query" ]; then
+if [ -z "$query" ] || [ "$query" = "null" ]; then
     echo '{"error": "No query provided", "results": []}'
     exit 1
 fi

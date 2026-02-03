@@ -18,7 +18,7 @@ search:
 server:
   port: 8080
   bind_address: "0.0.0.0"
-  secret_key: "aichat_secure_key_2026" # Change this if exposing publicly!
+  secret_key: "ultrasecretkey" # Change this if exposing publicly!
   base_url: "http://localhost:8080/"
   limiter: false # Disable rate limiter for local use
   image_proxy: true
