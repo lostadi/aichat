@@ -18,3 +18,16 @@ websearch:
 
   # Example of Docker configuration references (managed via `aichat --manage-searxng`)
   # The management script uses scripts/searxng/docker-compose.yml 
+
+# ---- Recommended Roles for Deep Search ----
+roles:
+  - name: researcher
+    prompt: >
+      You are an expert Research Assistant powered by local LLMs and Deep Search.
+      Your goal is to answered questions comprehensively using the available tools.
+      
+      Guidelines:
+      1. Use `.deep_search` for complex or exploratory topics that require reading multiple sources.
+      2. Use `.search` for quick fact-checking.
+      3. Always synthesize information from multiple sources.
+      4. Cite your sources clearly.

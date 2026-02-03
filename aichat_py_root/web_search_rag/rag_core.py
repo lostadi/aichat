@@ -7,6 +7,7 @@ import random
 import json
 import traceback
 import yaml
+import concurrent.futures
 from urllib.parse import quote_plus, urljoin, urlparse
 
 import requests
@@ -28,23 +29,19 @@ def load_config():
         "ollama_embedding_model": "nomic-embed-text",
         "chunk_size": 1000,
         "chunk_overlap": 200,
-        "k_retriever": 20, # Reduced from 200 for CLI speed
-        "k_context": 10,   # Reduced from 50 for CLI speed
+        "k_retriever": 20,
+        "k_context": 10,
     }
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, 'r') as f:
                 yaml_conf = yaml.safe_load(f)
-                # Look for 'websearch' key or fallback to top-level clients
                 if 'websearch' in yaml_conf:
                     ws = yaml_conf['websearch']
                     config["searxng_url"] = ws.get("searxng_url", config["searxng_url"])
                     if "ollama" in ws:
                          config["ollama_model"] = ws["ollama"].get("model", config["ollama_model"])
                          config["ollama_embedding_model"] = ws["ollama"].get("embedding_model", config["ollama_embedding_model"])
-                
-                # Also check clients for ollama/openai-compatible to infer defaults if not in websearch
-                # (Skipping complex inference for now to keep it simple, relying on defaults or explicit websearch config)
         except Exception as e:
             print(f"Warning: Error loading config from {CONFIG_PATH}: {e}")
     return config
@@ -54,9 +51,12 @@ CONF = load_config()
 SEARXNG_URL = CONF["searxng_url"]
 SEARXNG_MAX_RESULTS = 20
 REQUEST_TIMEOUT = 10
+# Max threads for parallel scraping
+MAX_WORKERS = 10 
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36',
 ]
 
 # --- Initialize LangChain Components ---
@@ -66,17 +66,65 @@ text_splitter = RecursiveCharacterTextSplitter(chunk_size=CONF["chunk_size"], ch
 
 def make_polite_request(url):
     headers = {'User-Agent': random.choice(USER_AGENTS)}
-    time.sleep(random.uniform(0.1, 0.3))
     try:
         response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         return response
-    except Exception as e:
-        # print(f"Error fetching {url}: {e}") # Sshh, quiet for CLI unless verbose
+    except Exception:
         return None
 
+def extract_text_from_html(html_content, url):
+    """
+    Extracts the main content from an HTML page using simple heuristics.
+    Prioritizes <article>, <main>, or specific classes.
+    """
+    if not html_content:
+        return ""
+    
+    soup = BeautifulSoup(html_content, 'html.parser')
+    
+    # Remove clutter
+    for tag in soup(["script", "style", "nav", "footer", "header", "noscript", "iframe", "svg", "button", "input"]):
+        tag.extract()
+        
+    # Heuristic: Try to find the main content container
+    content = None
+    
+    # List of tags/classes to check for main content
+    candidates = [
+        soup.find('article'),
+        soup.find('main'),
+        soup.find('div', class_=lambda x: x and ('content' in x or 'post' in x or 'article' in x or 'body' in x) and not ('sidebar' in x or 'comment' in x)),
+    ]
+    
+    for candidate in candidates:
+        if candidate:
+            text = candidate.get_text(separator=' ', strip=True)
+            # Basic sanity check: is it long enough to be an article?
+            if len(text) > 200:
+                content = text
+                break
+    
+    # Fallback to body if no refined content found
+    if not content:
+        content = soup.get_text(separator=' ', strip=True)
+        
+    return content
+
+def scrape_url(item):
+    """
+    Helper function to scrape a single URL.
+    Returns a dict with title, source, and page_content, or None on failure.
+    """
+    resp = make_polite_request(item['href'])
+    if resp:
+        text = extract_text_from_html(resp.content, item['href'])
+        if text:
+             # Limit individual page content size to avoid context overflow for massive pages
+            return {"title": item['title'], "source": item['href'], "page_content": text[:15000]}
+    return None
+
 def discover_urls(query):
-    # Simple discovery without LLM expansion for speed in CLI
     params = {'q': query, 'format': 'json', 'pageno': 1}
     try:
         resp = requests.get(f"{SEARXNG_URL.rstrip('/')}/search", params=params, timeout=REQUEST_TIMEOUT)
@@ -93,19 +141,21 @@ def discover_urls(query):
         print(f"SearXNG Error: {e}")
         return []
 
-def fetch_and_scrape(urls):
+def fetch_and_scrape_parallel(urls):
     docs = []
-    # Limit scraping to top 5 for speed
-    for item in urls[:5]:
-        resp = make_polite_request(item['href'])
-        if resp:
-            soup = BeautifulSoup(resp.content, 'html.parser')
-            # Kill script and style elements
-            for script in soup(["script", "style", "nav", "footer", "header"]):
-                script.extract()
-            text = soup.get_text(separator=' ', strip=True)
-            if text:
-                docs.append({"title": item['title'], "source": item['href'], "page_content": text[:10000]})
+    # Scrape top 8 results in parallel
+    targets = urls[:8]
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        future_to_url = {executor.submit(scrape_url, item): item for item in targets}
+        for future in concurrent.futures.as_completed(future_to_url):
+            try:
+                data = future.result()
+                if data:
+                    docs.append(data)
+            except Exception:
+                pass # Sshh, skip failures
+                
     return docs
 
 def rag_pipeline(query):
@@ -114,8 +164,9 @@ def rag_pipeline(query):
     if not urls:
         return "No results found from SearXNG."
     
-    print(f"Found {len(urls)} results. Scraping top 5...")
-    scraped_data = fetch_and_scrape(urls)
+    print(f"Found {len(urls)} results. parallel scraping top 8...")
+    scraped_data = fetch_and_scrape_parallel(urls)
+    
     if not scraped_data:
         return "Failed to scrape any content."
 
@@ -131,26 +182,28 @@ def rag_pipeline(query):
     if not all_texts:
         return "No text content extracted."
 
-    print(f"Indexing {len(all_texts)} chunks...")
+    print(f"Indexing {len(all_texts)} chunks from {len(scraped_data)} pages...")
     vectorstore = FAISS.from_texts(all_texts, embeddings, metadatas=all_metadatas)
     
     retriever = vectorstore.as_retriever(search_kwargs={"k": CONF["k_retriever"]})
     context_docs = retriever.invoke(query)
     
-    print("Generating answer...")
-    context_text = "\n\n".join([d.page_content for d in context_docs[:CONF["k_context"]]])
+    print("Generating enriched answer...")
+    context_text = "\n\n".join([f"[Source: {d.metadata['title']}]\n{d.page_content}" for d in context_docs[:CONF["k_context"]]])
     
     prompt = PromptTemplate.from_template(
-        "Based on the following context, answer the question.\n\n"
+        "You are a helpful research assistant. Answer the question based ONLY on the provided context.\n"
+        "If the answer is not in the context, say you don't know.\n"
+        "Cite your sources using [Title] notation where appropriate.\n\n"
         "Context:\n{context}\n\n"
         "Question: {question}\n\n"
-        "Answer:"
+        "Detailed Answer:"
     )
     
     chain = prompt | llm
     answer = chain.invoke({"context": context_text, "question": query})
     
-    # Format sources
+    # Format sources list
     sources = set()
     for doc in context_docs[:CONF["k_context"]]:
         sources.add(f"- {doc.metadata['title']}: {doc.metadata['source']}")
