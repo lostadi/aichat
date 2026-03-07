@@ -10,6 +10,10 @@ info() {
     echo "[INFO] $1"
 }
 
+warn() {
+    echo "[WARN] $1"
+}
+
 error() {
     echo "[ERROR] $1" >&2
     exit 1
@@ -21,7 +25,9 @@ install_dependencies() {
     sudo apt-get update
 
     info "Installing essential packages (git, build-essential, curl, libssl-dev, pkg-config)..."
-    sudo apt-get install -y git build-essential curl libssl-dev pkg-config
+    sudo apt-get install -y git build-essential curl libssl-dev pkg-config \
+        jq python3 python3-pip python3-venv docker.io docker-compose-v2 \
+        || sudo apt-get install -y jq python3 python3-pip python3-venv docker.io docker-compose
 
     # Install Rust using rustup
     if ! command -v cargo &> /dev/null; then
@@ -125,18 +131,29 @@ configure_aichat() {
     # Ensure config_file exists, create a basic one if not
     if [ ! -f "$config_file" ]; then
         info "Creating default aichat config at $config_file..."
-        echo "model: $default_ollama_model_for_aichat" > "$config_file"
-        echo "clients:" >> "$config_file"
-        echo "  - type: ollama" >> "$config_file"
-        echo "    name: ollama" >> "$config_file" # Give the client a name for clarity
-        echo "    models: {} # Will be populated by script" >> "$config_file"
+        cat > "$config_file" << EOF
+model: $default_ollama_model_for_aichat
+
+# ---- function-calling ----
+function_calling: true
+use_tools: web_search
+
+clients:
+  - type: ollama
+    name: ollama
+    models: {} # Will be populated by script
+EOF
     else
         info "Existing aichat config found at $config_file."
         # Set default model if no model line exists
         if ! grep -q "^model:" "$config_file"; then
             info "No default model set in $config_file. Setting to '$default_ollama_model_for_aichat'."
-            # Prepend to the file
             sed -i "1s;^;model: $default_ollama_model_for_aichat\n;" "$config_file"
+        fi
+        # Ensure function_calling is enabled
+        if ! grep -q "^function_calling:" "$config_file"; then
+            info "Enabling function_calling in $config_file."
+            sed -i "1s;^;function_calling: true\nuse_tools: web_search\n;" "$config_file"
         fi
         # Ensure clients section exists
         if ! grep -q "^clients:" "$config_file"; then
@@ -288,6 +305,35 @@ configure_aichat() {
     info "Run aichat using 'aichat' or 'aichat --model ollama:your-ollama-model-name'."
 }
 
+# --- Setup Docker Service and SearXNG ---
+setup_docker_and_searxng() {
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    info "Enabling and starting Docker service..."
+    sudo systemctl enable docker
+    sudo systemctl start docker
+
+    info "Setting up Docker group permissions..."
+    if ! groups | grep -q docker; then
+        sudo usermod -aG docker "$USER"
+        warn "Added $USER to docker group. You may need to log out and back in for this to take effect."
+    fi
+
+    info "Installing Python dependencies for Deep Search..."
+    pip3 install --user -r "$script_dir/aichat_py_root/web_search_rag/requirements.txt"
+
+    info "Making scripts executable..."
+    chmod +x "$script_dir/functions/bin/web_search" 2>/dev/null || true
+    chmod +x "$script_dir/functions/bin/execute_shell_command" 2>/dev/null || true
+    chmod +x "$script_dir/scripts/searxng/manage_searxng.sh" 2>/dev/null || true
+
+    info "Starting SearXNG container for web search..."
+    # Use sg to activate the docker group in this session without requiring re-login
+    sg docker -c "docker compose -f '$script_dir/scripts/searxng/docker-compose.yml' up -d" 2>/dev/null \
+        || warn "Could not start SearXNG. Run './scripts/searxng/manage_searxng.sh start' after logging out and back in."
+}
+
 # --- Setup Bash Completions ---
 setup_bash_completions() {
     info "Setting up bash completions for aichat..."
@@ -353,12 +399,20 @@ main() {
     install_ollama
     build_aichat # This was modified in the previous step
     configure_aichat
+    setup_docker_and_searxng
     setup_bash_completions # Add the call here
 
     info "aichat setup complete!"
     info "Ensure $HOME/.local/bin is in your PATH. You might need to open a new terminal or source your shell configuration file (e.g., source ~/.bashrc)."
     info "Try running 'aichat' or 'aichat --help'."
     info "To chat with the default Ollama model, try: aichat \"Hello, who are you?\""
+    info ""
+    info "Extended Features:"
+    info "  • Web Search:    aichat --search \"query\""
+    info "  • Deep Search:   aichat --deep-search \"query\""
+    if ! groups | grep -q docker; then
+        warn "NOTE: Log out and back in (or run 'newgrp docker') before using web search."
+    fi
 }
 
 # Run the main function

@@ -54,8 +54,10 @@ sudo apt install -y \
     docker.io \
     docker-compose-v2 || sudo apt install -y docker-compose
 
-# Step 2: Setup Docker permissions
+# Step 2: Setup Docker permissions and enable service
 info "Setting up Docker permissions..."
+sudo systemctl enable docker
+sudo systemctl start docker
 if ! groups | grep -q docker; then
     sudo usermod -aG docker "$USER"
     warn "Added $USER to docker group. You may need to log out and back in for this to take effect."
@@ -115,6 +117,10 @@ if [ ! -f "$CONFIG_DIR/config.yaml" ]; then
 # Default model - uses Ollama (local, no API key needed)
 model: ollama:llama3.2:1b
 
+# ---- function-calling ----
+function_calling: true
+use_tools: web_search
+
 clients:
   # Ollama - Local models (no API key required)
   - type: openai-compatible
@@ -173,7 +179,9 @@ fi
 # Step 10: Start SearXNG (for web search)
 info "Starting SearXNG container for web search..."
 if command -v docker &> /dev/null; then
-    ./scripts/searxng/manage_searxng.sh start 2>/dev/null || warn "Could not start SearXNG. You may need to run 'newgrp docker' or log out/in first."
+    # Use sg to activate the docker group in this session without requiring re-login
+    sg docker -c "docker compose -f '$SCRIPT_DIR/scripts/searxng/docker-compose.yml' up -d" 2>/dev/null \
+        || warn "Could not start SearXNG. Run './scripts/searxng/manage_searxng.sh start' after logging out and back in."
 fi
 
 echo ""
